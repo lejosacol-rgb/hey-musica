@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hey Música</title>
+
+<style>
+*{box-sizing:border-box;font-family:system-ui,sans-serif}
+body{
+  margin:0;min-height:100vh;background:#000;color:#fff;
+  display:flex;flex-direction:column;align-items:center;overflow:hidden
+}
+#bgImage,#bgVideo{
+  position:fixed;inset:0;width:100%;height:100%;
+  object-fit:cover;z-index:-2;display:none
+}
+#overlay{
+  position:fixed;inset:0;
+  background:linear-gradient(180deg,rgba(0,0,0,.55),rgba(0,0,0,.65));
+  z-index:-1
+}
+header{padding:14px;font-size:22px;font-weight:bold}
+#visualizer{position:absolute;inset:0;z-index:0}
+
+#center{
+  position:absolute;top:50%;transform:translateY(-50%);
+  z-index:1;display:flex;flex-direction:column;align-items:center
+}
+#modeIndicator{font-size:14px;color:#ffd36b;display:none}
+#songName{margin-top:8px;font-weight:bold;text-align:center}
+
+#controls{
+  position:fixed;bottom:16px;left:50%;transform:translateX(-50%);
+  display:flex;gap:18px;padding:14px 22px;
+  backdrop-filter:blur(14px);background:rgba(0,0,0,.35);
+  border-radius:30px;z-index:3
+}
+#controls button{font-size:22px;background:none;border:none;color:white}
+
+#bgBtn{
+  position:fixed;top:10px;right:10px;
+  background:rgba(0,0,0,.45);border:none;color:white;
+  padding:8px 12px;border-radius:14px;z-index:3
+}
+
+/* 📋 lista */
+#songList{
+  position:fixed;top:60px;left:10px;bottom:90px;width:260px;
+  background:rgba(0,0,0,.45);backdrop-filter:blur(10px);
+  border-radius:16px;padding:10px;overflow:auto;display:none;z-index:4
+}
+.songItem{
+  display:flex;justify-content:space-between;
+  padding:6px;cursor:pointer;
+  border-bottom:1px solid rgba(255,255,255,.1)
+}
+</style>
+</head>
+
+<body>
+
+<img id="bgImage">
+<video id="bgVideo" muted autoplay loop playsinline></video>
+<div id="overlay"></div>
+<canvas id="visualizer"></canvas>
+
+<header>🎵 Hey Música</header>
+
+<button id="bgBtn">🖼 Fondo</button>
+<input type="file" id="bgInput" accept="image/*,video/*,.gif" hidden>
+
+<div id="center">
+  <div id="modeIndicator">⭐ Favoritos · Aleatorio</div>
+  <div id="songName">---</div>
+</div>
+
+<div id="controls">
+  <button id="folderBtn">📂</button>
+  <button id="prevBtn">⏮</button>
+  <button id="playBtn">⏯</button>
+  <button id="nextBtn">⏭</button>
+  <button id="favBtn">☆</button>
+  <button id="listBtn">📋</button>
+  <button id="micBtn">🎤</button>
+</div>
+
+<div id="songList"></div>
+
+<input type="file" id="folderInput" webkitdirectory multiple hidden>
+<audio id="player"></audio>
+
+<script>
+/* ===== ELEMENTOS ===== */
+const player=document.getElementById("player");
+const folderBtn=document.getElementById("folderBtn");
+const folderInput=document.getElementById("folderInput");
+const prevBtn=document.getElementById("prevBtn");
+const playBtn=document.getElementById("playBtn");
+const nextBtn=document.getElementById("nextBtn");
+const favBtn=document.getElementById("favBtn");
+const listBtn=document.getElementById("listBtn");
+const micBtn=document.getElementById("micBtn");
+const songName=document.getElementById("songName");
+const modeIndicator=document.getElementById("modeIndicator");
+const songList=document.getElementById("songList");
+
+/* ===== ESTADO ===== */
+let playlist=[],playlistBackup=[];
+let index=0;
+const songId=f=>f.webkitRelativePath||f.name;
+let favoritos=JSON.parse(localStorage.getItem("favoritos")||"[]");
+let modoFavRandom=false,poolFavoritos=[],historialFav=[];
+
+/* ===== CARGA ===== */
+folderBtn.onclick=()=>folderInput.click();
+folderInput.onchange=e=>{
+  playlist=[...e.target.files].filter(f=>f.type.startsWith("audio"));
+  index=0; play(); renderSongList();
+};
+
+/* ===== PLAY ===== */
+function play(){
+  if(!playlist[index])return;
+  player.src=URL.createObjectURL(playlist[index]);
+  player.play();
+  actualizarFavoritoUI();
+}
+
+/* ===== CONTROLES ===== */
+playBtn.onclick=()=>player.paused?player.play():player.pause();
+prevBtn.onclick=()=>{index=(index-1+playlist.length)%playlist.length;play();};
+nextBtn.onclick=()=>{
+  if(modoFavRandom) siguienteFavoritoAleatorio();
+  else{index=(index+1)%playlist.length;play();}
+};
+
+/* ===== FAVORITOS ⭐ ===== */
+function actualizarFavoritoUI(){
+  const f=playlist[index]; if(!f)return;
+  const esFav=favoritos.includes(songId(f));
+  favBtn.textContent=esFav?"⭐":"☆";
+  songName.textContent=f.name+(esFav?" ⭐":"");
+}
+favBtn.onclick=()=>{
+  const f=playlist[index]; if(!f)return;
+  const id=songId(f);
+  favoritos.includes(id)
+    ?favoritos=favoritos.filter(x=>x!==id)
+    :favoritos.push(id);
+  localStorage.setItem("favoritos",JSON.stringify(favoritos));
+  actualizarFavoritoUI();
+  renderSongList();
+};
+
+/* ===== LISTA 📋 ===== */
+function renderSongList(){
+  songList.innerHTML="";
+  playlist.forEach(f=>{
+    const row=document.createElement("div");
+    row.className="songItem";
+    const name=document.createElement("span");
+    name.textContent=f.name;
+    name.onclick=()=>{index=playlist.indexOf(f);play();};
+    const star=document.createElement("span");
+    const id=songId(f);
+    star.textContent=favoritos.includes(id)?"⭐":"☆";
+    star.onclick=e=>{
+      e.stopPropagation();
+      favoritos.includes(id)
+        ?favoritos=favoritos.filter(x=>x!==id)
+        :favoritos.push(id);
+      localStorage.setItem("favoritos",JSON.stringify(favoritos));
+      actualizarFavoritoUI();
+      renderSongList();
+    };
+    row.append(name,star);
+    songList.appendChild(row);
+  });
+}
+listBtn.onclick=()=>{
+  songList.style.display=
+    songList.style.display==="none"?"block":"none";
+};
+
+/* ===== FAVORITOS ALEATORIO ===== */
+function reproducirFavoritosAleatorio(){
+  poolFavoritos=playlist.filter(f=>favoritos.includes(songId(f)));
+  if(!poolFavoritos.length)return;
+  playlistBackup=[...playlist];
+  historialFav=[];
+  modoFavRandom=true;
+  modeIndicator.style.display="block";
+  siguienteFavoritoAleatorio();
+}
+function siguienteFavoritoAleatorio(){
+  if(historialFav.length>=poolFavoritos.length) historialFav=[];
+  let i;
+  do{i=Math.floor(Math.random()*poolFavoritos.length);}
+  while(historialFav.includes(i));
+  historialFav.push(i);
+  index=playlist.indexOf(poolFavoritos[i]);
+  play();
+}
+function salirDeFavoritos(){
+  modoFavRandom=false;
+  poolFavoritos=[];
+  historialFav=[];
+  modeIndicator.style.display="none";
+  if(playlistBackup.length){
+    playlist=[...playlistBackup];
+    playlistBackup=[];
+  }
+  play();
+}
+
+/* ===== VOZ 🎤 ===== */
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+const rec=new SR();rec.lang="es-ES";rec.continuous=true;
+micBtn.onclick=()=>{try{rec.start()}catch(e){}};
+rec.onresult=e=>{
+  const t=e.results[e.results.length-1][0].transcript.toLowerCase();
+  if(t.includes("siguiente")) nextBtn.click();
+  if(t.includes("anterior")) prevBtn.click();
+  if(t.includes("pausa")) player.pause();
+  if(t.includes("stop")){player.pause();player.currentTime=0;}
+  if(t.includes("favoritos aleatorio")) reproducirFavoritosAleatorio();
+  if(t.includes("salir de favoritos")) salirDeFavoritos();
+  if(t.includes("reproduce mis favoritas")){
+    playlistBackup=[...playlist];
+    playlist=playlist.filter(f=>favoritos.includes(songId(f)));
+    index=0; play();
+  }
+};
+
+/* ===== FONDO 🖼 ===== */
+const bgBtn=document.getElementById("bgBtn");
+const bgInput=document.getElementById("bgInput");
+const bgImage=document.getElementById("bgImage");
+const bgVideo=document.getElementById("bgVideo");
+bgBtn.onclick=()=>bgInput.click();
+bgInput.onchange=e=>{
+  const file=e.target.files[0]; if(!file)return;
+  const url=URL.createObjectURL(file);
+  bgImage.style.display="none"; bgVideo.style.display="none";
+  if(file.type.startsWith("image")){
+    bgImage.src=url; bgImage.style.display="block";
+  }else if(file.type.startsWith("video")){
+    bgVideo.src=url; bgVideo.style.display="block"; bgVideo.play();
+  }
+};
+
+/* ===== VISUALIZADOR ===== */
+const canvas=document.getElementById("visualizer");
+const ctx=canvas.getContext("2d");
+function resize(){canvas.width=innerWidth;canvas.height=innerHeight}
+resize();onresize=resize;
+const audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+const analyser=audioCtx.createAnalyser();analyser.fftSize=256;
+const data=new Uint8Array(analyser.frequencyBinCount);
+const src=audioCtx.createMediaElementSource(player);
+src.connect(analyser);analyser.connect(audioCtx.destination);
+document.body.addEventListener("click",()=>audioCtx.resume(),{once:true});
+(function draw(){
+  requestAnimationFrame(draw);
+  analyser.getByteFrequencyData(data);
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  const bw=canvas.width/data.length;
+  for(let i=0;i<data.length;i++){
+    const h=data[i]/255*canvas.height*0.6;
+    ctx.fillStyle="rgba(120,180,255,.85)";
+    ctx.fillRect(i*bw,canvas.height-h,bw-1,h);
+  }
+})();
+</script>
+
+</body>
+</html>
+
