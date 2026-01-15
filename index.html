@@ -9,52 +9,55 @@
 *{box-sizing:border-box;font-family:system-ui,sans-serif}
 body{margin:0;min-height:100vh;background:#000;color:#fff;overflow:hidden}
 #bgImage,#bgVideo{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2;display:none}
-#overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:-1}
+#overlay{position:fixed;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.55),rgba(0,0,0,.65));z-index:-1}
 header{text-align:center;padding:14px;font-size:22px;font-weight:bold}
 #songName{text-align:center;font-weight:bold;margin-top:10px}
 #controls{position:fixed;bottom:15px;left:50%;transform:translateX(-50%);
-display:flex;gap:16px;background:rgba(0,0,0,.4);padding:14px 20px;border-radius:30px}
+display:flex;gap:16px;background:rgba(0,0,0,.4);padding:14px 20px;border-radius:30px;z-index:3}
 #controls button{font-size:22px;background:none;border:none;color:#fff}
 #songList{position:fixed;top:60px;left:10px;bottom:90px;width:260px;
 background:rgba(0,0,0,.45);backdrop-filter:blur(12px);border-radius:16px;
-padding:10px;overflow:auto;display:none}
+padding:10px;overflow:auto;display:none;z-index:4}
 .songItem{padding:6px;border-bottom:1px solid rgba(255,255,255,.15);cursor:pointer}
 #helpPanel{position:fixed;inset:40px;background:rgba(0,0,0,.75);
-border-radius:20px;padding:20px;overflow:auto;display:none}
+border-radius:20px;padding:20px;overflow:auto;display:none;z-index:5}
 </style>
 </head>
 
 <body>
 
 <img id="bgImage">
-<video id="bgVideo" muted autoplay loop></video>
+<video id="bgVideo" muted autoplay loop playsinline></video>
 <div id="overlay"></div>
 
 <header>🎵 Hey Música</header>
 <div id="songName">---</div>
 
 <div id="controls">
-<button id="folderBtn">📂</button>
-<button id="prevBtn">⏮</button>
-<button id="playBtn">⏯</button>
-<button id="nextBtn">⏭</button>
-<button id="favBtn">☆</button>
-<button id="listBtn">📋</button>
-<button id="micBtn">🎤</button>
-<button id="helpBtn">❓</button>
-<button id="bgBtn">🖼</button>
+  <button id="folderBtn">📂</button>
+  <button id="prevBtn">⏮</button>
+  <button id="playBtn">⏯</button>
+  <button id="nextBtn">⏭</button>
+  <button id="favBtn">☆</button>
+  <button id="listBtn">📋</button>
+  <button id="micBtn">🎤</button>
+  <button id="helpBtn">❓</button>
+  <button id="bgBtn">🖼</button>
 </div>
 
 <div id="songList"></div>
 
 <div id="helpPanel">
 <h3>🎤 Comandos de Voz</h3>
-<p>play, reproducir, continuar</p>
-<p>pausa, detener</p>
-<p>siguiente, anterior</p>
-<p>sube volumen, baja volumen</p>
-<p>buscar canción X</p>
-<p>pon canción X</p>
+<ul>
+<li>reproducir canción X</li>
+<li>reproducir X</li>
+<li>pausa / detener</li>
+<li>siguiente / anterior</li>
+<li>sube volumen / baja volumen</li>
+<li>abre lista / cierra lista</li>
+<li>cambia fondo</li>
+</ul>
 <button onclick="helpPanel.style.display='none'">Cerrar</button>
 </div>
 
@@ -63,80 +66,133 @@ border-radius:20px;padding:20px;overflow:auto;display:none}
 <audio id="player"></audio>
 
 <script>
-const $=id=>document.getElementById(id);
-const player=$("player"),songName=$("songName"),songList=$("songList");
-let playlist=[],index=0,favoritos=[];
-
-/* VOZ */
-function hablar(t){speechSynthesis.cancel();speechSynthesis.speak(new SpeechSynthesisUtterance(t));}
-
-/* CARGA */
-$("folderBtn").onclick=()=>$("folderInput").click();
-$("folderInput").onchange=e=>{
-playlist=[...e.target.files].filter(f=>f.type.startsWith("audio"));
-index=0;play();
-};
-
-/* PLAY */
-function play(){
-const f=playlist[index];if(!f)return;
-player.src=URL.createObjectURL(f);player.play();
-songName.textContent=f.name;
-renderList();
-hablar("Reproduciendo "+f.name);
+/* ========= UTILIDADES ========= */
+function hablar(t){
+  const u=new SpeechSynthesisUtterance(t);
+  u.lang="es-ES";
+  speechSynthesis.cancel();
+  speechSynthesis.speak(u);
 }
 
-/* CONTROLES */
+function normalizarTexto(txt){
+  return txt.toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+    .replace(/[^a-z0-9\s]/g,"")
+    .trim();
+}
+
+/* ========= ELEMENTOS ========= */
+const $=id=>document.getElementById(id);
+const player=$("player"),songName=$("songName"),songList=$("songList");
+let playlist=[],index=0;
+
+/* ========= CARGA CARPETA ========= */
+$("folderBtn").onclick=()=>$("folderInput").click();
+$("folderInput").onchange=e=>{
+  playlist=[...e.target.files].filter(f=>f.type.startsWith("audio"));
+  index=0;
+  play();
+};
+
+/* ========= PLAY ========= */
+function play(){
+  const f=playlist[index]; if(!f) return;
+  player.src=URL.createObjectURL(f);
+  player.play();
+  songName.textContent=f.name;
+  renderList();
+}
+
+/* ========= CONTROLES ========= */
 $("playBtn").onclick=()=>player.paused?player.play():player.pause();
 $("prevBtn").onclick=()=>{index=(index-1+playlist.length)%playlist.length;play();}
 $("nextBtn").onclick=()=>{index=(index+1)%playlist.length;play();}
 
-/* LISTA */
+/* ========= LISTA ========= */
 function renderList(){
-songList.innerHTML="";
-playlist.forEach((f,i)=>{
-const d=document.createElement("div");
-d.className="songItem";d.textContent=f.name;
-d.onclick=()=>{index=i;play();}
-songList.appendChild(d);
-});
+  songList.innerHTML="";
+  playlist.forEach((f,i)=>{
+    const d=document.createElement("div");
+    d.className="songItem";
+    d.textContent=f.name;
+    d.onclick=()=>{index=i;play();}
+    songList.appendChild(d);
+  });
 }
 $("listBtn").onclick=()=>songList.style.display=songList.style.display==="block"?"none":"block";
 
-/* AYUDA */
+/* ========= AYUDA ========= */
 $("helpBtn").onclick=()=>$("helpPanel").style.display="block";
 
-/* FONDO */
+/* ========= FONDO ========= */
 $("bgBtn").onclick=()=>$("bgInput").click();
 $("bgInput").onchange=e=>{
-const f=e.target.files[0];if(!f)return;
-const u=URL.createObjectURL(f);
-$("bgImage").style.display="none";$("bgVideo").style.display="none";
-if(f.type.startsWith("image")){$("bgImage").src=u;$("bgImage").style.display="block";}
-else{$("bgVideo").src=u;$("bgVideo").style.display="block";}
+  const f=e.target.files[0]; if(!f)return;
+  const u=URL.createObjectURL(f);
+  $("bgImage").style.display="none"; $("bgVideo").style.display="none";
+  if(f.type.startsWith("image")){
+    $("bgImage").src=u; $("bgImage").style.display="block";
+  }else{
+    $("bgVideo").src=u; $("bgVideo").style.display="block";
+  }
 };
 
-/* VOZ */
+/* ========= MATCH INTELIGENTE ========= */
+function buscarCancionInteligente(nombre){
+  const q=normalizarTexto(nombre);
+  let mejor=-1,p=0;
+
+  playlist.forEach((f,i)=>{
+    const n=normalizarTexto(f.name);
+    let score=0;
+    if(n.includes(q)) score+=5;
+    q.split(" ").forEach(w=>{if(n.includes(w)) score+=2;});
+    if(score>p){p=score;mejor=i;}
+  });
+  return mejor;
+}
+
+function reproducirCancionPorNombre(nombre){
+  if(!playlist.length){
+    hablar("No hay carpeta musical cargada");
+    return;
+  }
+  const i=buscarCancionInteligente(nombre);
+  if(i!==-1){
+    index=i; play();
+    hablar("Reproduciendo "+playlist[i].name);
+  }else{
+    hablar("No encontré la canción "+nombre);
+  }
+}
+
+/* ========= VOZ ========= */
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-const rec=new SR();rec.lang="es-ES";rec.continuous=true;
+const rec=new SR(); rec.lang="es-ES"; rec.continuous=true;
+
 $("micBtn").onclick=()=>{try{rec.start();hablar("Escuchando");}catch(e){}};
 
 rec.onresult=e=>{
-const t=e.results[e.results.length-1][0].transcript.toLowerCase();
-if(t.includes("play")||t.includes("reproducir")||t.includes("continuar"))player.play();
-if(t.includes("pausa")||t.includes("detener"))player.pause();
-if(t.includes("siguiente"))$("nextBtn").click();
-if(t.includes("anterior"))$("prevBtn").click();
-if(t.includes("sube volumen"))player.volume=Math.min(1,player.volume+.1);
-if(t.includes("baja volumen"))player.volume=Math.max(0,player.volume-.1);
-if(t.includes("abre lista"))songList.style.display="block";
-if(t.includes("cierra lista"))songList.style.display="none";
-if(t.includes("cambia fondo"))$("bgBtn").click();
-if(t.includes("buscar")||t.includes("pon")){
-const q=t.replace(/buscar|pon|canción/g,"").trim();
-const i=playlist.findIndex(f=>f.name.toLowerCase().includes(q));
-if(i>=0){index=i;play();}else hablar("No encontrada");
-}
+  const t=e.results[e.results.length-1][0].transcript.toLowerCase().trim();
+
+  if(t.startsWith("reproducir canción")){
+    reproducirCancionPorNombre(t.replace("reproducir canción","").trim());
+    return;
+  }
+  if(t.startsWith("reproducir")){
+    const n=t.replace("reproducir","").trim();
+    n?reproducirCancionPorNombre(n):player.play();
+    return;
+  }
+
+  if(t.includes("pausa")||t.includes("detener")) player.pause();
+  if(t.includes("siguiente")) $("nextBtn").click();
+  if(t.includes("anterior")) $("prevBtn").click();
+  if(t.includes("sube volumen")) player.volume=Math.min(1,player.volume+0.1);
+  if(t.includes("baja volumen")) player.volume=Math.max(0,player.volume-0.1);
+  if(t.includes("abre lista")) songList.style.display="block";
+  if(t.includes("cierra lista")) songList.style.display="none";
+  if(t.includes("cambia fondo")) $("bgBtn").click();
 };
 </script>
 
