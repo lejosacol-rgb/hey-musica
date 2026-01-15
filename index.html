@@ -38,13 +38,14 @@ header{padding:14px;font-size:22px;font-weight:bold}
 }
 #controls button{font-size:22px;background:none;border:none;color:white}
 
-#bgBtn{
-  position:fixed;top:10px;right:10px;
+#bgBtn,#helpBtn{
+  position:fixed;top:10px;
   background:rgba(0,0,0,.45);border:none;color:white;
   padding:8px 12px;border-radius:14px;z-index:3
 }
+#bgBtn{right:10px}
+#helpBtn{left:10px}
 
-/* 📋 lista */
 #songList{
   position:fixed;top:60px;left:10px;bottom:90px;width:260px;
   background:rgba(0,0,0,.45);backdrop-filter:blur(10px);
@@ -54,6 +55,25 @@ header{padding:14px;font-size:22px;font-weight:bold}
   display:flex;justify-content:space-between;
   padding:6px;cursor:pointer;
   border-bottom:1px solid rgba(255,255,255,.1)
+}
+
+/* Ayuda */
+#helpPanel{
+  position:fixed;inset:40px;
+  background:rgba(0,0,0,.75);
+  backdrop-filter:blur(14px);
+  border-radius:20px;
+  padding:20px;
+  overflow:auto;
+  display:none;
+  z-index:5
+}
+#helpPanel h2{margin-top:0}
+#helpPanel button{
+  margin-top:14px;
+  padding:8px 14px;
+  background:#222;color:#fff;
+  border:none;border-radius:10px
 }
 </style>
 </head>
@@ -67,8 +87,9 @@ header{padding:14px;font-size:22px;font-weight:bold}
 
 <header>🎵 Hey Música</header>
 
+<button id="helpBtn">❓</button>
 <button id="bgBtn">🖼 Fondo</button>
-<input type="file" id="bgInput" accept="image/*,video/*,.gif" hidden>
+<input type="file" id="bgInput" accept="image/*,video/*" hidden>
 
 <div id="center">
   <div id="modeIndicator">⭐ Favoritos · Aleatorio</div>
@@ -87,10 +108,37 @@ header{padding:14px;font-size:22px;font-weight:bold}
 
 <div id="songList"></div>
 
+<div id="helpPanel">
+<h2>🎤 Comandos de Voz</h2>
+<ul>
+<li>play / reproducir / continuar</li>
+<li>pausa / detener</li>
+<li>siguiente / anterior</li>
+<li>sube volumen / baja volumen</li>
+<li>silencio / quitar silencio</li>
+<li>abre lista / cierra lista</li>
+<li>marca como favorita</li>
+<li>favoritos aleatorio</li>
+<li>salir de favoritos</li>
+<li>cambia fondo</li>
+<li>buscar canción X</li>
+<li>pon canción X</li>
+</ul>
+<button onclick="helpPanel.style.display='none'">Cerrar</button>
+</div>
+
 <input type="file" id="folderInput" webkitdirectory multiple hidden>
 <audio id="player"></audio>
 
 <script>
+/* ===== TTS ===== */
+function hablar(t){
+  const u=new SpeechSynthesisUtterance(t);
+  u.lang="es-ES";
+  speechSynthesis.cancel();
+  speechSynthesis.speak(u);
+}
+
 /* ===== ELEMENTOS ===== */
 const player=document.getElementById("player");
 const folderBtn=document.getElementById("folderBtn");
@@ -102,178 +150,105 @@ const favBtn=document.getElementById("favBtn");
 const listBtn=document.getElementById("listBtn");
 const micBtn=document.getElementById("micBtn");
 const songName=document.getElementById("songName");
-const modeIndicator=document.getElementById("modeIndicator");
 const songList=document.getElementById("songList");
-
-/* ===== ESTADO ===== */
-let playlist=[],playlistBackup=[];
-let index=0;
-const songId=f=>f.webkitRelativePath||f.name;
-let favoritos=JSON.parse(localStorage.getItem("favoritos")||"[]");
-let modoFavRandom=false,poolFavoritos=[],historialFav=[];
-
-/* ===== CARGA ===== */
-folderBtn.onclick=()=>folderInput.click();
-folderInput.onchange=e=>{
-  playlist=[...e.target.files].filter(f=>f.type.startsWith("audio"));
-  index=0; play(); renderSongList();
-};
-
-/* ===== PLAY ===== */
-function play(){
-  if(!playlist[index])return;
-  player.src=URL.createObjectURL(playlist[index]);
-  player.play();
-  actualizarFavoritoUI();
-}
-
-/* ===== CONTROLES ===== */
-playBtn.onclick=()=>player.paused?player.play():player.pause();
-prevBtn.onclick=()=>{index=(index-1+playlist.length)%playlist.length;play();};
-nextBtn.onclick=()=>{
-  if(modoFavRandom) siguienteFavoritoAleatorio();
-  else{index=(index+1)%playlist.length;play();}
-};
-
-/* ===== FAVORITOS ⭐ ===== */
-function actualizarFavoritoUI(){
-  const f=playlist[index]; if(!f)return;
-  const esFav=favoritos.includes(songId(f));
-  favBtn.textContent=esFav?"⭐":"☆";
-  songName.textContent=f.name+(esFav?" ⭐":"");
-}
-favBtn.onclick=()=>{
-  const f=playlist[index]; if(!f)return;
-  const id=songId(f);
-  favoritos.includes(id)
-    ?favoritos=favoritos.filter(x=>x!==id)
-    :favoritos.push(id);
-  localStorage.setItem("favoritos",JSON.stringify(favoritos));
-  actualizarFavoritoUI();
-  renderSongList();
-};
-
-/* ===== LISTA 📋 ===== */
-function renderSongList(){
-  songList.innerHTML="";
-  playlist.forEach(f=>{
-    const row=document.createElement("div");
-    row.className="songItem";
-    const name=document.createElement("span");
-    name.textContent=f.name;
-    name.onclick=()=>{index=playlist.indexOf(f);play();};
-    const star=document.createElement("span");
-    const id=songId(f);
-    star.textContent=favoritos.includes(id)?"⭐":"☆";
-    star.onclick=e=>{
-      e.stopPropagation();
-      favoritos.includes(id)
-        ?favoritos=favoritos.filter(x=>x!==id)
-        :favoritos.push(id);
-      localStorage.setItem("favoritos",JSON.stringify(favoritos));
-      actualizarFavoritoUI();
-      renderSongList();
-    };
-    row.append(name,star);
-    songList.appendChild(row);
-  });
-}
-listBtn.onclick=()=>{
-  songList.style.display=
-    songList.style.display==="none"?"block":"none";
-};
-
-/* ===== FAVORITOS ALEATORIO ===== */
-function reproducirFavoritosAleatorio(){
-  poolFavoritos=playlist.filter(f=>favoritos.includes(songId(f)));
-  if(!poolFavoritos.length)return;
-  playlistBackup=[...playlist];
-  historialFav=[];
-  modoFavRandom=true;
-  modeIndicator.style.display="block";
-  siguienteFavoritoAleatorio();
-}
-function siguienteFavoritoAleatorio(){
-  if(historialFav.length>=poolFavoritos.length) historialFav=[];
-  let i;
-  do{i=Math.floor(Math.random()*poolFavoritos.length);}
-  while(historialFav.includes(i));
-  historialFav.push(i);
-  index=playlist.indexOf(poolFavoritos[i]);
-  play();
-}
-function salirDeFavoritos(){
-  modoFavRandom=false;
-  poolFavoritos=[];
-  historialFav=[];
-  modeIndicator.style.display="none";
-  if(playlistBackup.length){
-    playlist=[...playlistBackup];
-    playlistBackup=[];
-  }
-  play();
-}
-
-/* ===== VOZ 🎤 ===== */
-const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-const rec=new SR();rec.lang="es-ES";rec.continuous=true;
-micBtn.onclick=()=>{try{rec.start()}catch(e){}};
-rec.onresult=e=>{
-  const t=e.results[e.results.length-1][0].transcript.toLowerCase();
-  if(t.includes("siguiente")) nextBtn.click();
-  if(t.includes("anterior")) prevBtn.click();
-  if(t.includes("pausa")) player.pause();
-  if(t.includes("stop")){player.pause();player.currentTime=0;}
-  if(t.includes("favoritos aleatorio")) reproducirFavoritosAleatorio();
-  if(t.includes("salir de favoritos")) salirDeFavoritos();
-  if(t.includes("reproduce mis favoritas")){
-    playlistBackup=[...playlist];
-    playlist=playlist.filter(f=>favoritos.includes(songId(f)));
-    index=0; play();
-  }
-};
-
-/* ===== FONDO 🖼 ===== */
+const helpBtn=document.getElementById("helpBtn");
+const helpPanel=document.getElementById("helpPanel");
 const bgBtn=document.getElementById("bgBtn");
 const bgInput=document.getElementById("bgInput");
 const bgImage=document.getElementById("bgImage");
 const bgVideo=document.getElementById("bgVideo");
-bgBtn.onclick=()=>bgInput.click();
-bgInput.onchange=e=>{
-  const file=e.target.files[0]; if(!file)return;
-  const url=URL.createObjectURL(file);
-  bgImage.style.display="none"; bgVideo.style.display="none";
-  if(file.type.startsWith("image")){
-    bgImage.src=url; bgImage.style.display="block";
-  }else if(file.type.startsWith("video")){
-    bgVideo.src=url; bgVideo.style.display="block"; bgVideo.play();
-  }
+
+/* ===== ESTADO ===== */
+let playlist=[],index=0;
+const songId=f=>f.webkitRelativePath||f.name;
+let favoritos=JSON.parse(localStorage.getItem("favoritos")||"[]");
+
+/* ===== CARPETA ===== */
+folderBtn.onclick=()=>folderInput.click();
+folderInput.onchange=e=>{
+  playlist=[...e.target.files].filter(f=>f.type.startsWith("audio"));
+  index=0;
+  play();
 };
 
-/* ===== VISUALIZADOR ===== */
-const canvas=document.getElementById("visualizer");
-const ctx=canvas.getContext("2d");
-function resize(){canvas.width=innerWidth;canvas.height=innerHeight}
-resize();onresize=resize;
-const audioCtx=new (window.AudioContext||window.webkitAudioContext)();
-const analyser=audioCtx.createAnalyser();analyser.fftSize=256;
-const data=new Uint8Array(analyser.frequencyBinCount);
-const src=audioCtx.createMediaElementSource(player);
-src.connect(analyser);analyser.connect(audioCtx.destination);
-document.body.addEventListener("click",()=>audioCtx.resume(),{once:true});
-(function draw(){
-  requestAnimationFrame(draw);
-  analyser.getByteFrequencyData(data);
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  const bw=canvas.width/data.length;
-  for(let i=0;i<data.length;i++){
-    const h=data[i]/255*canvas.height*0.6;
-    ctx.fillStyle="rgba(120,180,255,.85)";
-    ctx.fillRect(i*bw,canvas.height-h,bw-1,h);
+/* ===== PLAY ===== */
+function play(){
+  const f=playlist[index]; if(!f)return;
+  player.src=URL.createObjectURL(f);
+  player.play();
+  songName.textContent=f.name;
+  favBtn.textContent=favoritos.includes(songId(f))?"⭐":"☆";
+  renderSongList();
+  hablar("Reproduciendo "+f.name);
+}
+
+/* ===== CONTROLES ===== */
+playBtn.onclick=()=>player.paused?player.play():player.pause();
+prevBtn.onclick=()=>{index=(index-1+playlist.length)%playlist.length;play();}
+nextBtn.onclick=()=>{index=(index+1)%playlist.length;play();}
+
+/* ===== FAVORITOS ===== */
+favBtn.onclick=()=>{
+  const f=playlist[index]; if(!f)return;
+  const id=songId(f);
+  favoritos.includes(id)?favoritos=favoritos.filter(x=>x!==id):favoritos.push(id);
+  localStorage.setItem("favoritos",JSON.stringify(favoritos));
+  favBtn.textContent=favoritos.includes(id)?"⭐":"☆";
+  renderSongList();
+};
+
+/* ===== LISTA ===== */
+function renderSongList(){
+  songList.innerHTML="";
+  playlist.forEach((f,i)=>{
+    const row=document.createElement("div");
+    row.className="songItem";
+    row.innerHTML=`<span>${f.name}</span><span>${favoritos.includes(songId(f))?"⭐":"☆"}</span>`;
+    row.onclick=()=>{index=i;play();}
+    songList.appendChild(row);
+  });
+}
+listBtn.onclick=()=>songList.style.display=songList.style.display==="block"?"none":"block";
+
+/* ===== AYUDA ===== */
+helpBtn.onclick=()=>helpPanel.style.display="block";
+
+/* ===== FONDO ===== */
+bgBtn.onclick=()=>bgInput.click();
+bgInput.onchange=e=>{
+  const f=e.target.files[0]; if(!f)return;
+  const u=URL.createObjectURL(f);
+  bgImage.style.display="none"; bgVideo.style.display="none";
+  if(f.type.startsWith("image")){bgImage.src=u;bgImage.style.display="block";}
+  else{bgVideo.src=u;bgVideo.style.display="block";bgVideo.play();}
+};
+
+/* ===== VOZ ===== */
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+const rec=new SR();rec.lang="es-ES";rec.continuous=true;
+micBtn.onclick=()=>{try{rec.start();hablar("Escuchando");}catch(e){}};
+
+rec.onresult=e=>{
+  const t=e.results[e.results.length-1][0].transcript.toLowerCase();
+
+  if(t.includes("siguiente")) nextBtn.click();
+  if(t.includes("anterior")) prevBtn.click();
+  if(t.includes("play")||t.includes("reproducir")) player.play();
+  if(t.includes("pausa")||t.includes("detener")) player.pause();
+  if(t.includes("sube volumen")) player.volume=Math.min(1,player.volume+0.1);
+  if(t.includes("baja volumen")) player.volume=Math.max(0,player.volume-0.1);
+  if(t.includes("abre lista")) songList.style.display="block";
+  if(t.includes("cierra lista")) songList.style.display="none";
+  if(t.includes("marca como favorita")) favBtn.click();
+  if(t.includes("cambia fondo")) bgBtn.click();
+
+  if(t.startsWith("buscar")||t.startsWith("pon")){
+    const q=t.replace(/buscar|pon|canción/g,"").trim();
+    const i=playlist.findIndex(f=>f.name.toLowerCase().includes(q));
+    if(i!==-1){index=i;play();}
   }
-})();
+};
 </script>
 
 </body>
 </html>
-
