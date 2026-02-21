@@ -3,197 +3,448 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Hey Música</title>
+<title>Control de Pagos</title>
 
 <style>
-*{box-sizing:border-box;font-family:system-ui,sans-serif}
-body{margin:0;min-height:100vh;background:#000;color:#fff;overflow:hidden}
-#bgImage,#bgVideo{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2;display:none}
-#overlay{position:fixed;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.55),rgba(0,0,0,.65));z-index:-1}
-header{text-align:center;padding:14px;font-size:22px;font-weight:bold}
-#songName{text-align:center;font-weight:bold;margin-top:10px}
-#controls{position:fixed;bottom:15px;left:50%;transform:translateX(-50%);
-display:flex;gap:16px;background:rgba(0,0,0,.4);padding:14px 20px;border-radius:30px;z-index:3}
-#controls button{font-size:22px;background:none;border:none;color:#fff}
-#songList{position:fixed;top:60px;left:10px;bottom:90px;width:260px;
-background:rgba(0,0,0,.45);backdrop-filter:blur(12px);border-radius:16px;
-padding:10px;overflow:auto;display:none;z-index:4}
-.songItem{padding:6px;border-bottom:1px solid rgba(255,255,255,.15);cursor:pointer}
-#helpPanel{position:fixed;inset:40px;background:rgba(0,0,0,.75);
-border-radius:20px;padding:20px;overflow:auto;display:none;z-index:5}
+:root{
+--bg1:#1a0026;
+--bg2:#32004d;
+--card:#2a003f;
+--primary:#e6007e;
+--success:#00ffb3;
+--warning:#ff0000;
+--text:#ffffff;
+--disabled:#555555;
+}
+
+body{
+margin:0;
+font-family:'Segoe UI',sans-serif;
+background:linear-gradient(160deg,var(--bg1),var(--bg2));
+color:var(--text);
+overflow-x:hidden;
+position:relative;
+}
+
+header{
+padding:20px;
+font-size:22px;
+font-weight:bold;
+backdrop-filter:blur(10px);
+position:sticky;
+top:0;
+background:rgba(26,0,38,.7);
+z-index:1;
+}
+
+.mini-dashboard{
+display:flex;
+gap:10px;
+overflow-x:auto;
+padding-top:10px;
+align-items:flex-end;
+}
+
+.mini-card{
+background:#3a0055;
+padding:12px;
+border-radius:15px;
+min-width:110px;
+text-align:center;
+box-shadow:0 5px 15px rgba(0,0,0,.3);
+}
+
+.mini-card span{
+display:block;
+font-size:18px;
+font-weight:bold;
+}
+
+.highlight{
+background:linear-gradient(145deg,#e6007e,#b3005c);
+}
+
+.container{padding:20px;}
+
+input,select{
+width:100%;
+padding:14px;
+margin-bottom:12px;
+border-radius:15px;
+border:none;
+background:#3a0055;
+color:white;
+}
+
+input:disabled{
+background:var(--disabled);
+color:#ccc;
+}
+
+button{
+padding:14px;
+border:none;
+border-radius:20px;
+margin-top:8px;
+font-weight:bold;
+cursor:pointer;
+}
+
+button.full-width{width:100%;}
+
+.btn-primary{background:var(--primary);color:white;}
+.btn-light{background:#ffffff22;color:white;}
+.btn-danger{background:#ff3b3b;color:white;}
+
+.cliente-card{
+background:var(--card);
+padding:15px;
+border-radius:20px;
+margin-bottom:12px;
+box-shadow:0 5px 15px rgba(0,0,0,.3);
+display:flex;
+flex-direction:column;
+gap:6px;
+}
+
+.estado-pagado{color:var(--success);font-weight:bold;}
+.estado-pendiente{color:var(--warning);font-weight:bold;}
+
+.modal{
+display:none;
+position:fixed;
+inset:0;
+background:rgba(0,0,0,.6);
+backdrop-filter:blur(8px);
+padding:20px;
+overflow:auto;
+z-index:1000;
+opacity:0;
+transition:opacity .25s ease;
+}
+
+.modal.active{
+display:block;
+opacity:1;
+}
+
+.modal-content{
+background:linear-gradient(145deg,#2a003f,#3a0055);
+padding:20px;
+border-radius:25px;
+box-shadow:0 20px 40px rgba(0,0,0,.5);
+}
+
+#listaWrapper{max-height:60vh; overflow-y:auto;}
+#listadoNumeradoWrapper div{
+background:rgba(255,255,255,0.05);
+border-radius:15px;
+margin-bottom:8px;
+padding:10px 12px;
+display:flex;
+justify-content:space-between;
+align-items:center;
+transition:background .2s;
+}
+#listadoNumeradoWrapper div:hover{background:rgba(255,255,255,0.12);}
+#listadoNumeradoWrapper{scroll-behavior:smooth;}
+
+.toast{
+position:fixed;
+bottom:30px;
+left:50%;
+transform:translateX(-50%);
+background:rgba(0,0,0,.85);
+color:white;
+padding:14px 24px;
+border-radius:25px;
+display:none;
+font-weight:bold;
+z-index:2000;
+box-shadow:0 0 15px rgba(0,0,0,.5);
+text-align:center;
+font-size:16px;
+}
+
+.toast-success{
+background:rgba(0,255,179,.9);
+color:black;
+}
+
+.toast-warning{
+background:rgba(255,204,0,.9);
+color:black;
+}
+
+#firma-yeimy{
+position:fixed;
+bottom:15px;
+right:20px;
+font-family:'Brush Script MT','Segoe Script',cursive;
+font-size:24px;
+color:#ffb3d9;
+font-weight:600;
+pointer-events:none;
+user-select:none;
+opacity:0.7;
+}
 </style>
 </head>
-
 <body>
 
-<img id="bgImage">
-<video id="bgVideo" muted autoplay loop playsinline></video>
-<div id="overlay"></div>
+<header>
+💜 Control de Pagos
+<div class="mini-dashboard">
+<div class="mini-card"><span id="countTotal">0</span><small>Clientes</small></div>
+<div class="mini-card"><span id="countPagados">0</span><small>Pagados</small></div>
+<div class="mini-card"><span id="countPendientes">0</span><small>Pendientes</small></div>
+<div class="mini-card highlight">
+<span id="totalRecogido">$0</span><small>Dinero Recogido</small>
+</div>
+<div class="mini-card highlight">
+<span id="totalPendienteTop">$0</span><small>Dinero Pendiente</small>
+</div>
+</div>
+</header>
 
-<header>🎵 Hey Música</header>
-<div id="songName">---</div>
+<div class="container">
+<input type="text" id="nombre" placeholder="Nombre completo">
+<input type="number" id="talla" placeholder="Talla">
+<input type="number" id="total" placeholder="Valor total">
+<input type="number" id="abono" placeholder="Abono inicial">
 
-<div id="controls">
-  <button id="folderBtn">📂</button>
-  <button id="prevBtn">⏮</button>
-  <button id="playBtn">⏯</button>
-  <button id="nextBtn">⏭</button>
-  <button id="favBtn">☆</button>
-  <button id="listBtn">📋</button>
-  <button id="micBtn">🎤</button>
-  <button id="helpBtn">❓</button>
-  <button id="bgBtn">🖼</button>
+<button class="btn-primary full-width" onclick="guardar()">Guardar Cliente</button>
+<button class="btn-light full-width" onclick="abrirLista()">Ver Clientes</button>
+<button class="btn-light full-width" onclick="abrirConfig()">📤 Exportar / Enviar</button>
 </div>
 
-<div id="songList"></div>
-
-<div id="helpPanel">
-<h3>🎤 Comandos de Voz</h3>
-<ul>
-<li>reproducir canción X</li>
-<li>reproducir X</li>
-<li>pausa / detener</li>
-<li>siguiente / anterior</li>
-<li>sube volumen / baja volumen</li>
-<li>abre lista / cierra lista</li>
-<li>cambia fondo</li>
-</ul>
-<button onclick="helpPanel.style.display='none'">Cerrar</button>
+<!-- MODAL CLIENTES -->
+<div class="modal" id="modal" onclick="cerrarSiFondo(event)">
+<div class="modal-content">
+<h2>Clientes</h2>
+<input type="text" id="buscador" placeholder="Buscar cliente..." onkeyup="mostrarLista()">
+<select id="filtro" onchange="mostrarLista()">
+<option value="todos">Todos</option>
+<option value="pagado">Pagados</option>
+<option value="pendiente">Pendientes</option>
+</select>
+<div id="listaWrapper"><div id="lista"></div></div>
+<button class="btn-primary full-width" onclick="cerrarLista()">Cerrar</button>
+</div>
 </div>
 
-<input type="file" id="folderInput" webkitdirectory multiple hidden>
-<input type="file" id="bgInput" accept="image/*,video/*" hidden>
-<audio id="player"></audio>
+<!-- MODAL EXPORTAR / LISTADO -->
+<div class="modal" id="config" onclick="cerrarSiFondo(event)">
+  <div class="modal-content">
+    <h2>Exportar / Enviar</h2>
+    
+    <!-- BOTÓN PARA ABRIR LISTADO NUMERADO -->
+    <button class="btn-light full-width" onclick="abrirListadoNumerado()">Ver Listado Numerado</button>
+    
+    <!-- BOTONES DE EXPORTACIÓN -->
+    <button class="btn-light full-width" onclick="exportarListadoExcel()">Exportar Excel</button>
+    <button class="btn-light full-width" onclick="exportarListadoWhatsApp()">Enviar por WhatsApp</button>
+    
+    <button class="btn-primary full-width" onclick="cerrarConfig()">Cerrar</button>
+  </div>
+</div>
+
+<!-- MODAL LISTADO NUMERADO -->
+<div class="modal" id="modalListado" onclick="cerrarSiFondo(event)">
+<div class="modal-content">
+<h2>Listado Numerado</h2>
+<div id="listadoNumeradoWrapper" style="max-height:50vh; overflow-y:auto; margin-bottom:12px;"></div>
+<button class="btn-primary full-width" onclick="cerrarListado()">Cerrar</button>
+</div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div id="firma-yeimy">Yeimy R. Te amo</div>
 
 <script>
-/* ========= UTILIDADES ========= */
-function hablar(t){
-  const u=new SpeechSynthesisUtterance(t);
-  u.lang="es-ES";
-  speechSynthesis.cancel();
-  speechSynthesis.speak(u);
+let registros=JSON.parse(localStorage.getItem("registrosNequi"))||[];
+
+function guardar(){
+let nombre=document.getElementById("nombre").value.trim();
+let talla=document.getElementById("talla").value;
+let total=parseFloat(document.getElementById("total").value);
+let abono=parseFloat(document.getElementById("abono").value)||0;
+if(!nombre||!total){mostrarToast("Completa los campos","warning");return;}
+
+registros.push({nombre,talla,total,abonado:abono,fecha:new Date().toLocaleDateString()});
+localStorage.setItem("registrosNequi",JSON.stringify(registros));
+
+document.getElementById("nombre").value="";
+document.getElementById("talla").value="";
+document.getElementById("total").value="";
+document.getElementById("abono").value="";
+
+mostrarToast("Cliente guardado correctamente","success");
+actualizarDashboard();
 }
 
-function normalizarTexto(txt){
-  return txt.toLowerCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
-    .replace(/[^a-z0-9\s]/g,"")
-    .trim();
+function abrirLista(){
+document.getElementById("modal").classList.add("active");
+mostrarLista();
 }
 
-/* ========= ELEMENTOS ========= */
-const $=id=>document.getElementById(id);
-const player=$("player"),songName=$("songName"),songList=$("songList");
-let playlist=[],index=0;
-
-/* ========= CARGA CARPETA ========= */
-$("folderBtn").onclick=()=>$("folderInput").click();
-$("folderInput").onchange=e=>{
-  playlist=[...e.target.files].filter(f=>f.type.startsWith("audio"));
-  index=0;
-  play();
-};
-
-/* ========= PLAY ========= */
-function play(){
-  const f=playlist[index]; if(!f) return;
-  player.src=URL.createObjectURL(f);
-  player.play();
-  songName.textContent=f.name;
-  renderList();
+function cerrarLista(){
+document.getElementById("modal").classList.remove("active");
 }
 
-/* ========= CONTROLES ========= */
-$("playBtn").onclick=()=>player.paused?player.play():player.pause();
-$("prevBtn").onclick=()=>{index=(index-1+playlist.length)%playlist.length;play();}
-$("nextBtn").onclick=()=>{index=(index+1)%playlist.length;play();}
-
-/* ========= LISTA ========= */
-function renderList(){
-  songList.innerHTML="";
-  playlist.forEach((f,i)=>{
-    const d=document.createElement("div");
-    d.className="songItem";
-    d.textContent=f.name;
-    d.onclick=()=>{index=i;play();}
-    songList.appendChild(d);
-  });
-}
-$("listBtn").onclick=()=>songList.style.display=songList.style.display==="block"?"none":"block";
-
-/* ========= AYUDA ========= */
-$("helpBtn").onclick=()=>$("helpPanel").style.display="block";
-
-/* ========= FONDO ========= */
-$("bgBtn").onclick=()=>$("bgInput").click();
-$("bgInput").onchange=e=>{
-  const f=e.target.files[0]; if(!f)return;
-  const u=URL.createObjectURL(f);
-  $("bgImage").style.display="none"; $("bgVideo").style.display="none";
-  if(f.type.startsWith("image")){
-    $("bgImage").src=u; $("bgImage").style.display="block";
-  }else{
-    $("bgVideo").src=u; $("bgVideo").style.display="block";
-  }
-};
-
-/* ========= MATCH INTELIGENTE ========= */
-function buscarCancionInteligente(nombre){
-  const q=normalizarTexto(nombre);
-  let mejor=-1,p=0;
-
-  playlist.forEach((f,i)=>{
-    const n=normalizarTexto(f.name);
-    let score=0;
-    if(n.includes(q)) score+=5;
-    q.split(" ").forEach(w=>{if(n.includes(w)) score+=2;});
-    if(score>p){p=score;mejor=i;}
-  });
-  return mejor;
+function abrirConfig(){
+document.getElementById("config").classList.add("active");
 }
 
-function reproducirCancionPorNombre(nombre){
-  if(!playlist.length){
-    hablar("No hay carpeta musical cargada");
-    return;
-  }
-  const i=buscarCancionInteligente(nombre);
-  if(i!==-1){
-    index=i; play();
-    hablar("Reproduciendo "+playlist[i].name);
-  }else{
-    hablar("No encontré la canción "+nombre);
-  }
+function cerrarConfig(){
+document.getElementById("config").classList.remove("active");
 }
 
-/* ========= VOZ ========= */
-const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-const rec=new SR(); rec.lang="es-ES"; rec.continuous=true;
+function abrirListadoNumerado(){
+document.getElementById("modalListado").classList.add("active");
+mostrarListadoNumerado();
+}
 
-$("micBtn").onclick=()=>{try{rec.start();hablar("Escuchando");}catch(e){}};
+function cerrarListado(){
+document.getElementById("modalListado").classList.remove("active");
+}
 
-rec.onresult=e=>{
-  const t=e.results[e.results.length-1][0].transcript.toLowerCase().trim();
+function cerrarSiFondo(e){
+if(e.target.classList.contains("modal")){
+e.target.classList.remove("active");
+}
+}
 
-  if(t.startsWith("reproducir canción")){
-    reproducirCancionPorNombre(t.replace("reproducir canción","").trim());
-    return;
-  }
-  if(t.startsWith("reproducir")){
-    const n=t.replace("reproducir","").trim();
-    n?reproducirCancionPorNombre(n):player.play();
-    return;
-  }
+function mostrarLista(){
+let lista=document.getElementById("lista");
+lista.innerHTML="";
+let buscador=document.getElementById("buscador").value.toLowerCase();
+let filtro=document.getElementById("filtro").value;
 
-  if(t.includes("pausa")||t.includes("detener")) player.pause();
-  if(t.includes("siguiente")) $("nextBtn").click();
-  if(t.includes("anterior")) $("prevBtn").click();
-  if(t.includes("sube volumen")) player.volume=Math.min(1,player.volume+0.1);
-  if(t.includes("baja volumen")) player.volume=Math.max(0,player.volume-0.1);
-  if(t.includes("abre lista")) songList.style.display="block";
-  if(t.includes("cierra lista")) songList.style.display="none";
-  if(t.includes("cambia fondo")) $("bgBtn").click();
-};
+registros.forEach((r,i)=>{
+let saldo=r.total-r.abonado;
+let estado=saldo<=0?"pagado":"pendiente";
+
+if((filtro==="todos"||filtro===estado) &&
+r.nombre.toLowerCase().includes(buscador)){
+
+lista.innerHTML+=`
+<div class="cliente-card">
+📅 ${r.fecha}<br>
+<b>${r.nombre}</b><br>
+Talla: ${r.talla}<br>
+Total: $${r.total}<br>
+Abonado: $${r.abonado}<br>
+Saldo: $${saldo}<br>
+Estado: <span class="estado-${estado}">${estado.toUpperCase()}</span><br><br>
+
+<div style="display:flex;gap:8px;align-items:center;">
+<input type="number" placeholder="Agregar abono" style="flex:1"
+${saldo<=0?'disabled':''}
+onchange="agregarAbono(${i},this.value)">
+<button class="btn-primary" style="height:46px;" ${saldo<=0?'disabled':''} onclick="agregarAbono(${i},this.value)">Abonar</button>
+</div>
+
+<button class="btn-danger full-width" onclick="eliminarCliente(${i})">Eliminar</button>
+</div>`;
+}
+});
+}
+
+function agregarAbono(i,valor){
+valor=parseFloat(valor);
+let saldo=registros[i].total-registros[i].abonado;
+if(saldo<=0){mostrarToast("Cliente ya pagado","warning");return;}
+if(!valor||valor<=0)return;
+if(valor>saldo)valor=saldo;
+
+registros[i].abonado+=valor;
+localStorage.setItem("registrosNequi",JSON.stringify(registros));
+mostrarLista();
+actualizarDashboard();
+}
+
+function eliminarCliente(i){
+registros.splice(i,1);
+localStorage.setItem("registrosNequi",JSON.stringify(registros));
+mostrarLista();
+actualizarDashboard();
+mostrarToast("Cliente eliminado","success");
+}
+
+function eliminarTodo(){
+registros=[];
+localStorage.removeItem("registrosNequi");
+actualizarDashboard();
+mostrarLista();
+mostrarToast("Todos los datos eliminados","warning");
+}
+
+// === LISTADO NUMERADO CON COLORES ===
+function mostrarListadoNumerado(){
+    let wrapper=document.getElementById("listadoNumeradoWrapper");
+    wrapper.innerHTML="";
+    registros.forEach((r,i)=>{
+        let saldo = r.total - r.abonado;
+        let color = saldo <= 0 ? "#00ffb3" : "#ff3333"; // verde si pagado, rojo si pendiente
+        let chulo = saldo <= 0 ? "✅" : "❌";
+        wrapper.innerHTML+=`
+        <div>
+            <span>${i+1}. ${r.nombre} - Talla: ${r.talla}</span>
+            <span style="color:${color}; font-weight:bold;">${chulo}</span>
+        </div>`;
+    });
+}
+
+function exportarListadoWhatsApp(){
+    if(registros.length===0){mostrarToast("No hay clientes para enviar","warning"); return;}
+    let texto="📋 *Listado de Clientes*\n\n";
+    registros.forEach((r,i)=>{
+        let saldo = r.total - r.abonado;
+        let chulo = saldo <= 0 ? "✅" : "❌";
+        texto+=`${i+1}. ${r.nombre} - Talla: ${r.talla} ${chulo}\n`;
+    });
+    window.open("https://wa.me/?text="+encodeURIComponent(texto));
+}
+
+function exportarListadoExcel(){
+    if(registros.length===0){mostrarToast("No hay clientes para exportar","warning"); return;}
+    let csv="Número,Nombre,Talla,Estado\n";
+    registros.forEach((r,i)=>{
+        let saldo = r.total - r.abonado;
+        let chulo = saldo <= 0 ? "✅" : "❌";
+        csv+=`${i+1},${r.nombre},${r.talla},${chulo}\n`;
+    });
+    let blob=new Blob([csv],{type:"text/csv"});
+    let link=document.createElement("a");
+    link.href=URL.createObjectURL(blob);
+    link.download="listado_clientes.csv";
+    link.click();
+}
+
+function actualizarDashboard(){
+let total=registros.length;
+let pagados=registros.filter(r=>r.total-r.abonado<=0).length;
+let pendientes=total-pagados;
+let dineroPendiente=registros.reduce((a,r)=>a+(r.total-r.abonado),0);
+let dineroRecogido=registros.reduce((a,r)=>a+r.abonado,0);
+
+document.getElementById("countTotal").innerText=total;
+document.getElementById("countPagados").innerText=pagados;
+document.getElementById("countPendientes").innerText=pendientes;
+document.getElementById("totalPendienteTop").innerText="$"+dineroPendiente;
+document.getElementById("totalRecogido").innerText="$"+dineroRecogido;
+}
+
+function mostrarToast(msg,tipo){
+let t=document.getElementById("toast");
+t.className="toast "+(tipo==="success"?"toast-success":"toast-warning");
+t.innerText=msg;
+t.style.display="block";
+setTimeout(()=>t.style.display="none",2500);
+}
+
+actualizarDashboard();
 </script>
 
 </body>
